@@ -18,9 +18,8 @@ using System.Text;
 /// </summary>
 public class DBManager : MonoBehaviour
 {
-	//public static DBManager Instance = null;
 	public bool DebugMode = false;
-    public GameObject table;
+    public Canvas tablePrefab;
 
 	// Location of database - this will be set during Awake as to stop Unity 5.4 error regarding initialization before scene is set
 	// file should show up in the Unity inspector after a few seconds of running it the first time
@@ -59,7 +58,7 @@ public class DBManager : MonoBehaviour
 
 		// just for testing, comment/uncomment to play with it
 		// note that it MUST be invoked after SQLite has initialized, 2-3 seconds later usually.  1 second is cutting it too close
-			Invoke("Test", 3);
+		Invoke("Test", 3);
 	}
 
 	/// <summary>
@@ -143,7 +142,7 @@ public class DBManager : MonoBehaviour
         /*
         GameObject[] tables;
         tables = GameObject.FindGameObjectsWithTag("Table");
-        foreach (GameObject table in tables)
+        foreach (GameObject table in m_tables)
         {
             table.close();
         }
@@ -172,16 +171,49 @@ public class DBManager : MonoBehaviour
             _reader.Close();
             return;
         }
+        if (DebugMode)
+            Debug.Log("SQLiter - SQLite table " + tableName + " was found");
         _reader.Close();
 
         // Instantiate new Table
-        if (DebugMode)
-            Debug.Log("SQLiter - SQLite table " + tableName + " was found");
-            
         Debug.Log("SQLiter - Creating new table: " + tableName);
-        //Instantiate(table);
-                
+        Canvas table = Instantiate(tablePrefab);
 
+        // give table its name, allow it to initialise
+        TableController tabCon = table.GetComponent<TableController>();
+        tabCon.SetName(tableName);
+
+        // fill up the table
+        _command.CommandText = "PRAGMA table_info(" + tableName + ")";
+        _reader = _command.ExecuteReader();
+        List<string> fields = new List<string> { };
+        while (_reader.Read())
+        {
+            fields.Add((string)_reader.GetValue(1));
+        }
+        _reader.Close();
+        tabCon.SetupHeader(fields);
+
+        _command.CommandText = "SELECT * FROM " + tableName;
+        _reader = _command.ExecuteReader();
+        while (_reader.Read())
+        {
+            List<string> data = new List<string> { };
+            for (int index = 0; index < _reader.FieldCount; ++index)
+            {
+                Debug.Log(_reader.GetString(index));
+                data.Add(_reader.GetString(index));
+            }
+
+            // view our output
+            if (DebugMode)
+            {
+                Debug.Log(data);
+            }
+            tabCon.AddRow(data);
+        }
+        _reader.Close();
+        
         // close connection
         _connection.Close();
     }
@@ -194,12 +226,15 @@ public class DBManager : MonoBehaviour
     {
         if (DebugMode)
             Debug.Log("--- Test Invoked ---");
+        /*
         string res = "";
         res = GetAllData("Player", 4);
         if (DebugMode) {
             Debug.Log("--- Test Results ---");
             Debug.Log(res);
         }
+        */
+        CreateTable("Player");
     }
     #endregion
 
