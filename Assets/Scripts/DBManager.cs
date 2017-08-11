@@ -24,7 +24,7 @@ public class DBManager : MonoBehaviour
 	// Location of database - this will be set during Awake as to stop Unity 5.4 error regarding initialization before scene is set
 	// file should show up in the Unity inspector after a few seconds of running it the first time
 	private static string _sqlDBLocation = "";
-    private string SQL_DB_NAME = "RPG";                // Table name and DB actual file location
+    private string SQL_DB_NAME = "mondial";                // Table name and DB actual file location
 
 	/// <summary>
 	/// DB objects
@@ -201,15 +201,16 @@ public class DBManager : MonoBehaviour
             List<string> data = new List<string> { };
             for (int index = 0; index < _reader.FieldCount; ++index)
             {
-                Debug.Log(_reader.GetString(index));
-                data.Add(_reader.GetString(index));
+                if (!_reader.IsDBNull(index))
+                {
+                    data.Add(_reader.GetString(index));
+                }
+                else
+                {
+                    data.Add("");
+                }
             }
-
-            // view our output
-            if (DebugMode)
-            {
-                Debug.Log(data);
-            }
+            
             tabCon.AddRow(data);
         }
         _reader.Close();
@@ -234,7 +235,7 @@ public class DBManager : MonoBehaviour
             Debug.Log(res);
         }
         */
-        CreateTable("Player");
+        CreateTable("Country");
     }
     #endregion
 
@@ -280,10 +281,10 @@ public class DBManager : MonoBehaviour
 		while (_reader.Read())
 		{
             string temp = _reader.GetString(0);
-            Debug.Log(_reader.GetString(0));
+            //Debug.Log(_reader.GetString(0));
             for (int index = 1; index < fieldCount; ++index)
             {
-                Debug.Log(_reader.GetString(index));
+                //Debug.Log(_reader.GetString(index));
                 temp += " " + _reader.GetString(index);
             }
             res += temp + "\n";

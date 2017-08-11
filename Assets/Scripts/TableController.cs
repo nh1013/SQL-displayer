@@ -5,14 +5,14 @@ using System.Collections.Generic;
 
 public class TableController : MonoBehaviour
 {
-    public GameObject tablePrefab;      // includes view port and scroll components
     public Text headerPrefab;           // used to update the header row
     public GameObject rowPrefab;        // used to store cells
     public Text cellPrefab;             // used to insert more data
 
-    public RectTransform tableWindow;   // outer content tab
+    public RectTransform fullContent;   // outer content rect
+    public RectTransform dataViewport;  // cells UI mask
+    public RectTransform dataContent;   // cells rect
     public RectTransform headerRow;     // row which stores headers
-    public RectTransform dataWindow;    // inner content tab of cells
 
     private DBManager manager;
     private int rowCount = 0;
@@ -30,7 +30,6 @@ public class TableController : MonoBehaviour
         {
             Debug.Log("Cannot find 'Manager' script");
         }
-        tableWindow = null;
     }
 
     public void SetName(string name) {
@@ -56,14 +55,17 @@ public class TableController : MonoBehaviour
     /// </summary>
     public void AddRow(List<string> data)
     {
-        GameObject row = Instantiate(rowPrefab, dataWindow);
+        GameObject row = Instantiate(rowPrefab, dataContent);
         foreach (string info in data)
         {
             Text cell = Instantiate(cellPrefab, row.transform);
             cell.text = info;
         }
         rowCount++;
-        UpdateWindow();
+
+        // Increase the height of dataContent
+        dataContent.sizeDelta = new Vector2(dataContent.sizeDelta.x, 
+            dataContent.sizeDelta.y + row.GetComponent<RectTransform>().sizeDelta.y);
     }
 
     /// <summary>
@@ -82,9 +84,9 @@ public class TableController : MonoBehaviour
     /// </summary>
     public void ClearData()
     {
-        for (int i = dataWindow.childCount; i >= 0; i--)
+        for (int i = dataContent.childCount; i >= 0; i--)
         {
-            Destroy(dataWindow.GetChild(i).gameObject);
+            Destroy(dataContent.GetChild(i).gameObject);
         }
         rowCount = 0;
         UpdateWindow();
@@ -100,16 +102,19 @@ public class TableController : MonoBehaviour
         {
             headerWidth += headerRow.GetChild(i).GetComponent<RectTransform>().sizeDelta.x;
         }
+        // table should be as wide as the fields require
         headerRow.sizeDelta = new Vector2(headerWidth, headerRow.sizeDelta.y);
+        fullContent.sizeDelta = new Vector2(headerWidth, fullContent.sizeDelta.y);
+        dataViewport.sizeDelta = new Vector2(headerWidth, dataViewport.sizeDelta.y);
         float dataHeight = 0;
-        for (int i = dataWindow.childCount - 1; i >= 0; i--)
+        for (int i = dataContent.childCount - 1; i >= 0; i--)
         {
             dataHeight += headerRow.GetChild(i).GetComponent<RectTransform>().sizeDelta.y;
         }
-        dataWindow.sizeDelta  = new Vector2(headerWidth, dataHeight);
-        tableWindow.sizeDelta = new Vector2(headerWidth, headerRow.sizeDelta.y + dataHeight);
+        // data content rect needs to adjust height based on amount of data
+        dataContent.sizeDelta  = new Vector2(headerWidth, dataHeight);
         Debug.Log("header width = " + headerWidth + ", data height = " + dataHeight);
-        Debug.Log("data window size = " + dataWindow.sizeDelta);
+        Debug.Log("data window size = " + dataContent.sizeDelta);
     }
 
     // Update is called once per frame
