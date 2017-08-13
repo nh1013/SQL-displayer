@@ -5,6 +5,7 @@
 //----------------------------------------------
 
 using UnityEngine;
+using UnityEngine.UI;
 using System.Data;
 using Mono.Data.SqliteClient;
 using System.Collections.Generic;
@@ -14,16 +15,17 @@ using System.Text;
 
 /// <summary>
 /// The DBManager holds the database connection, and is the point of contact for all Table classes to run SQL statements
-/// It is used to manage (create, manipulate, update, destroy) Tables of the DBManager's database
+/// It is used to manage (create, manipulate, update, destroy) Tables of the DBManager's selected database
 /// </summary>
 public class DBManager : MonoBehaviour
 {
 	public bool DebugMode = false;
-    public Canvas tablePrefab;
+    public RectTransform tablePrefab;
+    public Canvas screenCanvas;
 
-	// Location of database - this will be set during Awake as to stop Unity 5.4 error regarding initialization before scene is set
-	// file should show up in the Unity inspector after a few seconds of running it the first time
-	private static string _sqlDBLocation = "";
+    // Location of database - this will be set during Awake as to stop Unity 5.4 error regarding initialization before scene is set
+    // file should show up in the Unity inspector after a few seconds of running it the first time
+    private static string _sqlDBLocation = "";
     private string SQL_DB_NAME = "mondial";                // Table name and DB actual file location
 
 	/// <summary>
@@ -44,8 +46,6 @@ public class DBManager : MonoBehaviour
 	{
 		if (DebugMode)
 			Debug.Log("--- Awake ---");
-		//Instance = this;
-		SQLiteInit();
 	}
 
 	/// <summary>
@@ -55,11 +55,11 @@ public class DBManager : MonoBehaviour
 	{
 		if (DebugMode)
 			Debug.Log("--- Start ---");
-
-		// just for testing, comment/uncomment to play with it
-		// note that it MUST be invoked after SQLite has initialized, 2-3 seconds later usually.  1 second is cutting it too close
-		Invoke("Test", 3);
-	}
+        
+        // just for testing, comment/uncomment to play with it
+        // note that it MUST be invoked after SQLite has initialized, 2-3 seconds later usually.  1 second is cutting it too close
+        //Invoke("Test", 3);
+    }
 
 	/// <summary>
 	/// Uncomment if you want to see the time it takes to do things
@@ -92,7 +92,7 @@ public class DBManager : MonoBehaviour
 	/// <summary>
 	/// Basic initialization of SQLite
 	/// </summary>
-	private void SQLiteInit()
+	public void SQLiteInit()
 	{
         // here is where we set the file location
         // ------------ IMPORTANT ---------
@@ -101,6 +101,7 @@ public class DBManager : MonoBehaviour
         // you can play around with the path if you like, but build-vs-run locations need to be taken into account
         _sqlDBLocation = "URI=file:Databases/" + SQL_DB_NAME + ".db";
         Debug.Log("SQLiter - Opening SQLite Connection at " + _sqlDBLocation);
+
 		_connection = new SqliteConnection(_sqlDBLocation);
 		_command = _connection.CreateCommand();
 		_connection.Open();
@@ -115,6 +116,7 @@ public class DBManager : MonoBehaviour
 		if (DebugMode && _reader.Read())
 			Debug.Log("SQLiter - WAL value is: " + _reader.GetString(0));
 		_reader.Close();
+        _connection.Close();
 
         /*
 		// more speed increases
@@ -128,95 +130,106 @@ public class DBManager : MonoBehaviour
 			Debug.Log("SQLiter - synchronous value is: " + _reader.GetInt32(0));
 		_reader.Close();
         */
-	}
+    }
 
     /// <summary>
     /// Change the database the manager is connected to
     /// Closes all tables and renews all SQLite connections
     /// </summary>
-    void ChangeDatabase(string newDBName)
+    public void ChangeDatabase(string newDBName)
     {
         if (DebugMode)
             Debug.Log("--- Changing database from " + SQL_DB_NAME + " to " + newDBName + " ---");
         // close/delete any existing Tables
-        /*
         GameObject[] tables;
         tables = GameObject.FindGameObjectsWithTag("Table");
-        foreach (GameObject table in m_tables)
+        foreach (GameObject table in tables)
         {
-            table.close();
+            Destroy(table);
         }
         // close connection to current database
         SQLiteClose();
         // establish connection to new database
         SQL_DB_NAME = newDBName;
         SQLiteInit();
-        // update relevant variables
-        */
+    }
+
+
+    /// <summary>
+    /// returns an array of tables in the current database
+    /// </summary>
+    public List<string> GetTables()
+    {
+        if (DebugMode)
+            Debug.Log("--- Retrieving tables from " + SQL_DB_NAME + " ---");
+        
+        // executes query that select names of all tables in master table of the database
+        _connection.Open();
+        _command.CommandText =  "SELECT name FROM sqlite_master " +
+                                "WHERE type = 'table'" +
+                                "ORDER BY 1";
+        _reader = _command.ExecuteReader();
+
+        List<string> tables = new List<string> { };
+        while (_reader.Read())
+        {
+            if (!_reader.IsDBNull(0))
+            {
+                tables.Add(_reader.GetString(0));
+            }
+            else
+            {
+                tables.Add("");
+            }
+        }
+        if (DebugMode)
+        {
+            foreach (string table in tables)
+            {
+                Debug.Log(table);
+            }
+        }
+        // close connections
+        _reader.Close();
+        _connection.Close();
+
+        return tables;
     }
 
     /// <summary>
     /// Creates the target Table for display, if found in the database
     /// </summary>
-    void CreateTable(string tableName)
+    public RectTransform CreateTable(string tableName)
     {
         if (DebugMode)
             Debug.Log("--- Creating Table instance " + tableName + " ---");
         // check if the table exists in the database. If it doesn't exist we abort.
+        _connection.Open();
         _command.CommandText = "SELECT name FROM sqlite_master WHERE name='" + tableName + "'";
         _reader = _command.ExecuteReader();
         if (!_reader.Read())
         {
             Debug.Log("SQLiter - Could not find SQLite table " + tableName);
             _reader.Close();
-            return;
+            return null;
         }
         if (DebugMode)
             Debug.Log("SQLiter - SQLite table " + tableName + " was found");
         _reader.Close();
+        _connection.Close();
 
         // Instantiate new Table
         Debug.Log("SQLiter - Creating new table: " + tableName);
-        Canvas table = Instantiate(tablePrefab);
+        RectTransform table = Instantiate(tablePrefab, screenCanvas.transform);
+        table.name = "table " + tableName;
 
         // give table its name, allow it to initialise
         TableController tabCon = table.GetComponent<TableController>();
-        tabCon.SetName(tableName);
+        tabCon.tableName = tableName;
 
         // fill up the table
-        _command.CommandText = "PRAGMA table_info(" + tableName + ")";
-        _reader = _command.ExecuteReader();
-        List<string> fields = new List<string> { };
-        while (_reader.Read())
-        {
-            fields.Add((string)_reader.GetValue(1));
-        }
-        _reader.Close();
-        tabCon.SetupHeader(fields);
-
-        _command.CommandText = "SELECT * FROM " + tableName;
-        _reader = _command.ExecuteReader();
-        while (_reader.Read())
-        {
-            List<string> data = new List<string> { };
-            for (int index = 0; index < _reader.FieldCount; ++index)
-            {
-                if (!_reader.IsDBNull(index))
-                {
-                    data.Add(_reader.GetString(index));
-                }
-                else
-                {
-                    data.Add("");
-                }
-            }
-            
-            tabCon.AddRow(data);
-        }
-        _reader.Close();
-        
-        // close connection
-        _connection.Close();
+        FillAllData(tabCon);
+        return table;
     }
 
     #region Test
@@ -266,38 +279,44 @@ public class DBManager : MonoBehaviour
 	#region Get Whole Table
 
 	/// <summary>
-	/// Select and retrieve an entire table. Not very efficient.
+	/// Select and retrieve an entire table.
 	/// </summary>
-	public string GetAllData(string table, int fieldCount)
-	{
-        //List<string> res = new List<string>();
-        //StringBuilder sb = new StringBuilder();
+	public void FillAllData(TableController table)
+    {
         _connection.Open();
-
-		// if you have a bunch of stuff, this is going to be inefficient and a pain. It's just for testing/show
-		_command.CommandText = "SELECT * FROM " + table;
-		_reader = _command.ExecuteReader();
-        string res = "";
-		while (_reader.Read())
-		{
-            string temp = _reader.GetString(0);
-            //Debug.Log(_reader.GetString(0));
-            for (int index = 1; index < fieldCount; ++index)
-            {
-                //Debug.Log(_reader.GetString(index));
-                temp += " " + _reader.GetString(index);
-            }
-            res += temp + "\n";
-
-			// view our output
-			if (DebugMode) {
-                Debug.Log(res);
-            }
+        _command.CommandText = "PRAGMA table_info(" + table.tableName + ")";
+        _reader = _command.ExecuteReader();
+        List<string> fields = new List<string> { };
+        while (_reader.Read())
+        {
+            fields.Add((string)_reader.GetValue(1));
         }
         _reader.Close();
-		_connection.Close();
-        return res;
-	}
+        table.SetupHeader(fields);
+
+        _command.CommandText = "SELECT * FROM " + table.tableName;
+        _reader = _command.ExecuteReader();
+        while (_reader.Read())
+        {
+            List<string> data = new List<string> { };
+            for (int index = 0; index < _reader.FieldCount; ++index)
+            {
+                if (!_reader.IsDBNull(index))
+                {
+                    data.Add(_reader.GetString(index));
+                }
+                else
+                {
+                    data.Add("");
+                }
+            }
+
+            table.AddRow(data);
+        }
+        // close connections
+        _reader.Close();
+        _connection.Close();
+    }
 
 	/// <summary>
 	/// Supply the column and the value you're trying to find, and it will use the primary key to query the result
@@ -337,7 +356,7 @@ public class DBManager : MonoBehaviour
 	#region Delete
 
 	/// <summary>
-	/// Basic delete, using the name primary key for the 
+	/// Basic delete
 	/// </summary>
 	/// <param name="wordKey"></param>
 	public void DeleteEntries(string table, string criterion)

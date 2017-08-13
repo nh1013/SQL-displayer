@@ -9,18 +9,23 @@ public class TableController : MonoBehaviour
     public GameObject rowPrefab;        // used to store cells
     public Text cellPrefab;             // used to insert more data
 
+    private DBManager    manager;
+    private ControlPanel controlPanel;
     public RectTransform fullContent;   // outer content rect
     public RectTransform dataViewport;  // cells UI mask
     public RectTransform dataContent;   // cells rect
     public RectTransform headerRow;     // row which stores headers
 
-    private DBManager manager;
+    public bool debugMode = false;
+    public string tableName;
+
+    private RectTransform table;
     private int rowCount = 0;
-    private string m_tableName;
 
     // Use this for initialization
     void Start()
     {
+        table = GetComponent<RectTransform>();
         GameObject managerObject = GameObject.FindWithTag("Manager");
         if (managerObject != null)
         {
@@ -30,10 +35,15 @@ public class TableController : MonoBehaviour
         {
             Debug.Log("Cannot find 'Manager' script");
         }
-    }
-
-    public void SetName(string name) {
-        m_tableName = name;
+        GameObject controlPanelObject = GameObject.FindWithTag("ControlPanel");
+        if (controlPanelObject != null)
+        {
+            controlPanel = controlPanelObject.GetComponent<ControlPanel>();
+        }
+        if (controlPanel == null)
+        {
+            Debug.Log("Cannot find 'ControlPanel' script");
+        }
     }
 
     /// <summary>
@@ -113,8 +123,23 @@ public class TableController : MonoBehaviour
         }
         // data content rect needs to adjust height based on amount of data
         dataContent.sizeDelta  = new Vector2(headerWidth, dataHeight);
-        Debug.Log("header width = " + headerWidth + ", data height = " + dataHeight);
-        Debug.Log("data window size = " + dataContent.sizeDelta);
+        if (debugMode)
+        {
+            Debug.Log("header width = " + headerWidth + ", data height = " + dataHeight);
+            Debug.Log("data window size = " + dataContent.sizeDelta);
+        }
+    }
+
+    public void OnDrag(UnityEngine.EventSystems.BaseEventData eventData)
+    {
+        var pointerData = eventData as UnityEngine.EventSystems.PointerEventData;
+        if (pointerData == null)
+            return;
+        
+        Vector3 currentPosition = table.position;
+        currentPosition.x += pointerData.delta.x;
+        currentPosition.y += pointerData.delta.y;
+        table.position = currentPosition;
     }
 
     // Update is called once per frame
