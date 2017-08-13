@@ -12,20 +12,23 @@ public class TableController : MonoBehaviour
     private DBManager    manager;
     private ControlPanel controlPanel;
     public RectTransform fullContent;   // outer content rect
-    public RectTransform dataViewport;  // cells UI mask
+    public RectTransform dataSection;   // cells ScrollRect controller
     public RectTransform dataContent;   // cells rect
     public RectTransform headerRow;     // row which stores headers
 
     public bool debugMode = false;
     public string tableName;
+    public string creationCommand;
 
     private RectTransform table;
+    private float tableWidthMax = 400;
+    private float tableHeightMax = 600;
+    private float borderWidth = 20;
     private int rowCount = 0;
 
     // Use this for initialization
     void Start()
     {
-        table = GetComponent<RectTransform>();
         GameObject managerObject = GameObject.FindWithTag("Manager");
         if (managerObject != null)
         {
@@ -44,6 +47,7 @@ public class TableController : MonoBehaviour
         {
             Debug.Log("Cannot find 'ControlPanel' script");
         }
+        table = gameObject.GetComponent<RectTransform>();
     }
 
     /// <summary>
@@ -57,7 +61,6 @@ public class TableController : MonoBehaviour
             Text header = Instantiate(headerPrefab, headerRow);
             header.text = name;
         }
-        UpdateWindow();
     }
 
     /// <summary>
@@ -74,8 +77,8 @@ public class TableController : MonoBehaviour
         rowCount++;
 
         // Increase the height of dataContent
-        dataContent.sizeDelta = new Vector2(dataContent.sizeDelta.x, 
-            dataContent.sizeDelta.y + row.GetComponent<RectTransform>().sizeDelta.y);
+        //dataContent.sizeDelta = new Vector2(dataContent.sizeDelta.x, 
+        //    dataContent.sizeDelta.y + row.GetComponent<RectTransform>().sizeDelta.y);
     }
 
     /// <summary>
@@ -99,7 +102,42 @@ public class TableController : MonoBehaviour
             Destroy(dataContent.GetChild(i).gameObject);
         }
         rowCount = 0;
-        UpdateWindow();
+    }
+    /// <summary>
+    /// Initialise the size of windows
+    /// </summary>
+    public void InitialiseWindow()
+    {
+        if (table == null)
+        {
+            table = gameObject.GetComponent<RectTransform>();
+        }
+        float headerWidth = 0;
+        for (int i = headerRow.childCount - 1; i >= 0; i--)
+        {
+            headerWidth += headerRow.GetChild(i).GetComponent<RectTransform>().sizeDelta.x;
+        }
+        float dataHeight = 0;
+        for (int i = dataContent.childCount - 1; i >= 0; i--)
+        {
+            dataHeight += dataContent.GetChild(i).GetComponent<RectTransform>().sizeDelta.y;
+        }
+
+        // table should be as wide as the fields require, as tall as data require
+        headerRow.sizeDelta = new Vector2(headerWidth, headerRow.sizeDelta.y);
+        dataContent.sizeDelta = new Vector2(headerWidth, dataHeight);
+
+        table.sizeDelta = new Vector2(
+            Mathf.Min(table.sizeDelta.x, headerWidth + borderWidth),
+            Mathf.Min(table.sizeDelta.y, dataContent.sizeDelta.y + headerRow.sizeDelta.y + borderWidth)
+        );
+        fullContent.sizeDelta = new Vector2(headerWidth, table.sizeDelta.y - borderWidth);
+        dataSection.sizeDelta = new Vector2(headerWidth, fullContent.sizeDelta.y - headerRow.sizeDelta.y);
+        // data content rect needs to adjust height based on amount of data
+        if (debugMode)
+        {
+            Debug.Log("data window size = " + dataContent.sizeDelta);
+        }
     }
 
     /// <summary>
@@ -107,25 +145,31 @@ public class TableController : MonoBehaviour
     /// </summary>
     public void UpdateWindow()
     {
+        if (table == null)
+        {
+            table = gameObject.GetComponent<RectTransform>();
+        }
         float headerWidth = 0;
         for (int i = headerRow.childCount - 1; i >= 0; i--)
         {
             headerWidth += headerRow.GetChild(i).GetComponent<RectTransform>().sizeDelta.x;
         }
-        // table should be as wide as the fields require
+        // table should be as wide as the fields require, as tall as data require
         headerRow.sizeDelta = new Vector2(headerWidth, headerRow.sizeDelta.y);
-        fullContent.sizeDelta = new Vector2(headerWidth, fullContent.sizeDelta.y);
-        dataViewport.sizeDelta = new Vector2(headerWidth, dataViewport.sizeDelta.y);
-        float dataHeight = 0;
-        for (int i = dataContent.childCount - 1; i >= 0; i--)
-        {
-            dataHeight += headerRow.GetChild(i).GetComponent<RectTransform>().sizeDelta.y;
-        }
+        dataContent.sizeDelta  = new Vector2(
+            dataContent.GetComponent<VerticalLayoutGroup>().preferredWidth, 
+            dataContent.GetComponent<VerticalLayoutGroup>().preferredHeight
+        );
+        
+        table.sizeDelta = new Vector2(
+            Mathf.Min(table.sizeDelta.x, headerWidth + borderWidth), 
+            Mathf.Min(table.sizeDelta.y, dataContent.sizeDelta.y + headerRow.sizeDelta.y + borderWidth)
+        );
+        fullContent.sizeDelta = new Vector2(headerWidth, table.sizeDelta.y - borderWidth);
+        dataSection.sizeDelta = new Vector2(headerWidth, fullContent.sizeDelta.y - headerRow.sizeDelta.y);
         // data content rect needs to adjust height based on amount of data
-        dataContent.sizeDelta  = new Vector2(headerWidth, dataHeight);
         if (debugMode)
         {
-            Debug.Log("header width = " + headerWidth + ", data height = " + dataHeight);
             Debug.Log("data window size = " + dataContent.sizeDelta);
         }
     }
@@ -139,13 +183,17 @@ public class TableController : MonoBehaviour
         Vector3 currentPosition = table.position;
         currentPosition.x += pointerData.delta.x;
         currentPosition.y += pointerData.delta.y;
+        //Debug.Log("press position = " + pointerData.pressPosition);
+        //Debug.Log("table position = " + table.position);
+        //Debug.Log("pointer delta = " + pointerData.delta);
+        //Debug.Log("pointer position = " + pointerData.position);
         table.position = currentPosition;
     }
 
     // Update is called once per frame
     void Update()
     {
-        //tableText.text = newText;
+        //UpdateWindow();
     }
 
     /// <summary>

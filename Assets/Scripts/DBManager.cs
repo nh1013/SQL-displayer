@@ -204,8 +204,9 @@ public class DBManager : MonoBehaviour
         if (DebugMode)
             Debug.Log("--- Creating Table instance " + tableName + " ---");
         // check if the table exists in the database. If it doesn't exist we abort.
+        string commandText = "SELECT name FROM sqlite_master WHERE name='" + tableName + "'";
         _connection.Open();
-        _command.CommandText = "SELECT name FROM sqlite_master WHERE name='" + tableName + "'";
+        _command.CommandText = commandText;
         _reader = _command.ExecuteReader();
         if (!_reader.Read())
         {
@@ -226,6 +227,7 @@ public class DBManager : MonoBehaviour
         // give table its name, allow it to initialise
         TableController tabCon = table.GetComponent<TableController>();
         tabCon.tableName = tableName;
+        tabCon.creationCommand = commandText;
 
         // fill up the table
         FillAllData(tabCon);
@@ -313,6 +315,7 @@ public class DBManager : MonoBehaviour
 
             table.AddRow(data);
         }
+        table.InitialiseWindow();
         // close connections
         _reader.Close();
         _connection.Close();
